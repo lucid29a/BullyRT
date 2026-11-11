@@ -47,7 +47,7 @@ Everything is in `BullyDX12.ini` and in the in-game menu. **Info > Reset all set
 | Draw distance | `[Culling] DrawDistance` | How much farther objects keep their detailed model. 1 is the game's own distance. |
 | Renderer | `[Renderer] Backend` | `D3D9On12` (default), or `Native` to run the stock Direct3D 9 without any of the above. |
 
-DLSS Ray Reconstruction needs NVIDIA's `nvngx_dlssd.dll` in `BullyDX12\bridge`. Without it, NRD is used.
+DLSS Ray Reconstruction needs NVIDIA's [`nvngx_dlssd.dll`](https://github.com/NVIDIA/DLSS/raw/v310.9.16/lib/Windows_x86_64/rel/nvngx_dlssd.dll) (DLSS SDK 310.9.16, not included) in `BullyDX12\bridge`. Without it, NRD is used.
 
 ## Building
 
