@@ -54,7 +54,7 @@ DLSS Ray Reconstruction needs NVIDIA's `nvngx_dlssd.dll` in `BullyDX12\bridge`. 
 You need Visual Studio 2022 or 2026 with the **Desktop development with C++** workload and the Windows SDK, which provides `fxc` and `dxc`. Python 3 is only needed for the tools.
 
 ```
-git clone --recursive https://github.com/<you>/BullyRT.git
+git clone --recursive https://github.com/lucid29a/BullyRT.git
 cd BullyRT
 build.bat Release "C:\Program Files (x86)\Steam\steamapps\common\Bully Scholarship Edition"
 ```
