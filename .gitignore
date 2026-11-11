@@ -1,0 +1,7 @@
+build/
+build64/
+out/
+.vs/
+*.user
+__pycache__/
+*.pyc

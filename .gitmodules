@@ -1,0 +1,18 @@
+[submodule "external/DLSS"]
+	path = external/DLSS
+	url = https://github.com/NVIDIA/DLSS.git
+[submodule "external/NRD"]
+	path = external/NRD
+	url = https://github.com/NVIDIA-RTX/NRD.git
+[submodule "external/NRI"]
+	path = external/NRI
+	url = https://github.com/NVIDIA-RTX/NRI.git
+[submodule "external/RTXDI"]
+	path = external/RTXDI
+	url = https://github.com/NVIDIA-RTX/RTXDI-Library.git
+[submodule "external/RTXGI"]
+	path = external/RTXGI
+	url = https://github.com/NVIDIA-RTX/RTXGI.git
+[submodule "external/imgui"]
+	path = external/imgui
+	url = https://github.com/ocornut/imgui.git
