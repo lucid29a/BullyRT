@@ -5,3 +5,4 @@ out/
 *.user
 __pycache__/
 *.pyc
+external/AgilitySDK/

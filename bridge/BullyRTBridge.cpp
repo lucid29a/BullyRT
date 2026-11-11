@@ -20,6 +20,9 @@
 #include <vector>
 
 #include "BridgeProtocol.h"
+
+extern "C" { __declspec(dllexport) extern const UINT D3D12SDKVersion = 620; }
+extern "C" { __declspec(dllexport) extern const char* D3D12SDKPath = ".\\D3D12\\"; }
 #include "RTX_CSTrace.h"
 #include "RTX_CSComposite.h"
 #include "RTX_CSExposure.h"
@@ -595,6 +598,7 @@ private:
     bool                         m_havePrev = false;
     ComPtr<ID3D12Resource>       m_rrColor, m_rrDiff, m_rrSpec, m_rrNormal, m_rrMv, m_rrOut;
     ComPtr<ID3D12PipelineState>  m_noisyPso;
+    int                          m_highestShaderModel = 0x66;
     bool                         m_rrAlbedo = false, m_nrdReady = false, m_rrReady = false, m_rrWanted = true, m_rrNow = false, m_rrFailed = false, m_rrKey = false;
     NVSDK_NGX_Parameter*         m_ngxParams = nullptr;
     NVSDK_NGX_Handle*            m_rrHandle = nullptr;
@@ -678,6 +682,13 @@ bool Bridge::Init(const std::wstring& mappingName)
         return false;
     }
     Log("Device: %ls, DXR tier %d.%d", ad.Description, o5.RaytracingTier / 10, o5.RaytracingTier % 10);
+    {
+        D3D12_FEATURE_DATA_SHADER_MODEL sm = {D3D_SHADER_MODEL_6_6};
+        if (FAILED(m_device->CheckFeatureSupport(D3D12_FEATURE_SHADER_MODEL, &sm, sizeof(sm)))) sm.HighestShaderModel = D3D_SHADER_MODEL_6_5;
+        m_highestShaderModel = static_cast<int>(sm.HighestShaderModel);
+        Log("Shader Model %d.%d (the Agility SDK in D3D12\\ is %s)", m_highestShaderModel >> 4, m_highestShaderModel & 15,
+            GetModuleHandleW(L"D3D12Core.dll") ? "loaded" : "not loaded");
+    }
     {
         const std::wstring ini = g_dir + L"..\\..\\BullyDX12.ini";
         m_rrWanted = GetPrivateProfileIntW(L"RTOptions", L"Denoiser", 1, ini.c_str()) != 0;
@@ -793,7 +804,14 @@ bool Bridge::Init(const std::wstring& mappingName)
     D3D12_COMPUTE_PIPELINE_STATE_DESC pd = {};
     pd.pRootSignature                    = m_rootSig.Get();
     pd.CS                                = {g_RTX_CSTrace, sizeof(g_RTX_CSTrace)};
-    if (FAILED(m_device->CreateComputePipelineState(&pd, IID_PPV_ARGS(&m_tracePso)))) { Fail("trace PSO failed"); return false; }
+    if (FAILED(m_device->CreateComputePipelineState(&pd, IID_PPV_ARGS(&m_tracePso)))) {
+        if (m_highestShaderModel < D3D_SHADER_MODEL_6_6)
+            Fail("trace PSO failed: this Direct3D 12 offers Shader Model %d.%d, the ray tracing needs 6.6 (D3D12\\D3D12Core.dll missing next to "
+                 "BullyRTBridge.exe, or Windows 10 older than 1909, or an old GPU driver)", m_highestShaderModel >> 4, m_highestShaderModel & 15);
+        else
+            Fail("trace PSO failed");
+        return false;
+    }
     pd.CS = {g_RTX_CSComposite, sizeof(g_RTX_CSComposite)};
     if (FAILED(m_device->CreateComputePipelineState(&pd, IID_PPV_ARGS(&m_compositePso)))) { Fail("composite PSO failed"); return false; }
     pd.CS = {g_RTX_CSSharcUpdate, sizeof(g_RTX_CSSharcUpdate)};

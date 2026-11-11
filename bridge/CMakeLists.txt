@@ -77,9 +77,26 @@ target_link_libraries(BullyRTBridge PRIVATE d3d12 dxgi shell32 NRI NRD "${_ext}/
 target_include_directories(BullyRTBridge PRIVATE "${_ext}/DLSS/include")
 target_include_directories(BullyRTBridge PRIVATE "${_ext}/NRD/Integration" "${_ext}/NRD/Include" "${_ext}/NRI/Include")
 
+set(AGILITY_VERSION 1.620.2)
+set(_agility "${_ext}/AgilitySDK/${AGILITY_VERSION}")
+set(_d3d12core "${_agility}/build/native/bin/x64/D3D12Core.dll")
+if(NOT EXISTS "${_d3d12core}")
+    set(_pkg "${_ext}/AgilitySDK/microsoft.direct3d.d3d12.${AGILITY_VERSION}.nupkg")
+    if(NOT EXISTS "${_pkg}")
+        message(STATUS "Downloading the DirectX 12 Agility SDK ${AGILITY_VERSION}")
+        file(DOWNLOAD "https://api.nuget.org/v3-flatcontainer/microsoft.direct3d.d3d12/${AGILITY_VERSION}/microsoft.direct3d.d3d12.${AGILITY_VERSION}.nupkg"
+             "${_pkg}" EXPECTED_HASH SHA256=70489669c2bbeaf318b62d72b0ac3e753d521387bfc848c9763791c4e920bfcc TLS_VERIFY ON)
+    endif()
+    file(ARCHIVE_EXTRACT INPUT "${_pkg}" DESTINATION "${_agility}")
+endif()
+add_custom_command(TARGET BullyRTBridge POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:BullyRTBridge>/D3D12"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${_d3d12core}" "$<TARGET_FILE_DIR:BullyRTBridge>/D3D12/D3D12Core.dll")
+
 if(BULLYDX12_DEPLOY)
     add_custom_command(TARGET BullyRTBridge POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E make_directory "${BULLY_GAME_DIR}/BullyDX12/bridge"
+        COMMAND ${CMAKE_COMMAND} -E make_directory "${BULLY_GAME_DIR}/BullyDX12/bridge/D3D12"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different "${_d3d12core}" "${BULLY_GAME_DIR}/BullyDX12/bridge/D3D12/D3D12Core.dll"
         COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_SOURCE_DIR}/materials.ini "${BULLY_GAME_DIR}/BullyDX12/bridge/materials.ini"
         COMMAND ${CMAKE_COMMAND} -E copy_if_different "${_ext}/DLSS/lib/Windows_x86_64/rel/nvngx_dlssd.dll" "${BULLY_GAME_DIR}/BullyDX12/bridge/nvngx_dlssd.dll"
         COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:BullyRTBridge> "${BULLY_GAME_DIR}/BullyDX12/bridge/BullyRTBridge.exe"
