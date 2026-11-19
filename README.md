@@ -46,6 +46,13 @@ Everything is in `BullyDX12.ini` and in the in-game menu. **Info > Reset all set
 | Lighting | `[RTOptions] Lighting` | 0 off, 1 medium, 2 ultra, 3 psycho: how much indirect light is traced. |
 | Draw distance | `[Culling] DrawDistance` | How much farther objects keep their detailed model. 1 is the game's own distance. |
 | Renderer | `[Renderer] Backend` | `D3D9On12` (default), or `Native` to run the stock Direct3D 9 without any of the above. |
+| Safe mode | `[Safety] Guard` | 1 (default) turns the safe mode below on, 0 turns it off. |
+
+### Safe mode
+
+At every start BullyRT writes to `BullyDX12.log` which Windows build it runs on, which system DLLs it found and which of its own files are in place. If something it needs is missing (no Direct3D 12, no D3D9On12, the `bridge` folder not copied), it falls back to the stock Direct3D 9 instead of leaving the game without a picture.
+
+It also remembers starts that did not finish, in `%LOCALAPPDATA%\BullyDX12\state.txt`. After two in a row the next start runs without the extensions (no ray tracing, no game patches). After three it runs on the stock Direct3D 9. A start that runs for a few seconds, or a normal exit, puts everything back. The log says `SAFE MODE` when this happens. To force a normal start, delete `state.txt`.
 
 DLSS Ray Reconstruction needs NVIDIA's [`nvngx_dlssd.dll`](https://github.com/NVIDIA/DLSS/raw/v310.9.16/lib/Windows_x86_64/rel/nvngx_dlssd.dll) (DLSS SDK 310.9.16, not included) in `BullyDX12\bridge`. Without it, NRD is used.
 
@@ -102,7 +109,8 @@ Please attach:
 
 ## Known issues
 
-- On some Windows 10 22H2 systems the game closes while `d3d9.dll` is loading, before anything is logged. This is being investigated.
+- On Windows 10 the ray tracing needs Shader Model 6.6, which comes from the `BullyDX12\bridge\D3D12` folder in the archive. Keep it there.
+- On at least one Windows Insider build (26300) the window stays blank or white while the game runs. This is being investigated: please send both logs.
 - Performance depends heavily on the ray resolution. If the frame rate is low, set Ray resolution to Third.
 - Moving characters are lit from fewer samples than the world and can look softer.
 
