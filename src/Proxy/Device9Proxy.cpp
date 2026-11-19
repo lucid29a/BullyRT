@@ -281,6 +281,21 @@ HRESULT Device9Proxy::Present(const RECT* src, const RECT* dst, HWND wnd, const 
                                                    : m_real->Present(src, dst, wnd, dirty);
     QueryPerformanceCounter(&t3);
     telemetry::OnPresent(t0, t1, t2, t3, hr);
+
+    static unsigned s_presents = 0;
+    static HRESULT  s_lastHr   = S_OK;
+    ++s_presents;
+    if (s_presents <= 3 || hr != s_lastHr) {
+        HWND w = m_pp.hDeviceWindow ? m_pp.hDeviceWindow : m_focus;
+        RECT wr = {}, cr = {};
+        if (w) { GetWindowRect(w, &wr); GetClientRect(w, &cr); }
+        BDX_INFO("Present #%u -> %s | window %p %s%s%s rect %ld,%ld %ldx%ld client %ldx%ld | back buffer %ux%u fmt %d swap %d x%u",
+                 s_presents, HResultName(hr), w, w && IsWindowVisible(w) ? "visible" : "HIDDEN", w && IsIconic(w) ? " iconic" : "",
+                 w && GetForegroundWindow() == w ? " foreground" : " background", wr.left, wr.top, wr.right - wr.left,
+                 wr.bottom - wr.top, cr.right - cr.left, cr.bottom - cr.top, m_pp.BackBufferWidth, m_pp.BackBufferHeight,
+                 static_cast<int>(m_pp.BackBufferFormat), static_cast<int>(m_pp.SwapEffect), m_pp.BackBufferCount);
+        s_lastHr = hr;
+    }
     return hr;
 }
 
@@ -541,7 +556,16 @@ HRESULT Device9Proxy::DrawIndexedPrimitiveUP(D3DPRIMITIVETYPE t, UINT minVertex,
     return hr;
 }
 
-HRESULT Device9Proxy::TestCooperativeLevel() { return m_real->TestCooperativeLevel(); }
+HRESULT Device9Proxy::TestCooperativeLevel()
+{
+    const HRESULT hr = m_real->TestCooperativeLevel();
+    static HRESULT s_last = D3D_OK;
+    if (hr != s_last) {
+        BDX_INFO("TestCooperativeLevel -> %s (the game resets the device when this is not OK)", HResultName(hr));
+        s_last = hr;
+    }
+    return hr;
+}
 UINT    Device9Proxy::GetAvailableTextureMem() { return m_real->GetAvailableTextureMem(); }
 HRESULT Device9Proxy::EvictManagedResources() { return m_real->EvictManagedResources(); }
 HRESULT Device9Proxy::GetDeviceCaps(D3DCAPS9* p) { return m_real->GetDeviceCaps(p); }

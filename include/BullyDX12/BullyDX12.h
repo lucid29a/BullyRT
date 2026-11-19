@@ -95,6 +95,7 @@ struct PostProcessContext {
     UINT                        height;
     uint64_t                    frameIndex;
     float                       deltaTimeSeconds;
+    bool*                       drawn;
 };
 
 struct FrameInfo {

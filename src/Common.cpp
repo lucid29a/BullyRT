@@ -44,6 +44,51 @@ void Startup(const char* step)
     CloseHandle(h);
 }
 
+static bool StatePath(wchar_t* file, size_t n)
+{
+    wchar_t local[MAX_PATH] = {};
+    if (GetEnvironmentVariableW(L"LOCALAPPDATA", local, MAX_PATH) == 0) return false;
+    wchar_t dir[MAX_PATH + 32];
+    wsprintfW(dir, L"%s\\BullyDX12", local);
+    CreateDirectoryW(dir, nullptr);
+    return wsprintfW(file, L"%s\\state.txt", dir) > 0 && n > 0;
+}
+
+static void WriteState(const wchar_t* file, const char* text)
+{
+    HANDLE h = CreateFileW(file, GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (h == INVALID_HANDLE_VALUE) return;
+    DWORD written = 0;
+    WriteFile(h, text, static_cast<DWORD>(lstrlenA(text)), &written, nullptr);
+    CloseHandle(h);
+}
+
+int BeginRunGuard()
+{
+    wchar_t file[MAX_PATH + 64] = {};
+    if (!StatePath(file, MAX_PATH)) return 0;
+    int failed = 0;
+    HANDLE h = CreateFileW(file, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (h != INVALID_HANDLE_VALUE) {
+        char buf[32] = {};
+        DWORD got = 0;
+        ReadFile(h, buf, sizeof(buf) - 1, &got, nullptr);
+        CloseHandle(h);
+        if (lstrcmpiA(buf, "ok") != 0 && buf[0] != 0) failed = atoi(buf);
+    }
+    ++failed;
+    char text[16];
+    wsprintfA(text, "%d", failed);
+    WriteState(file, text);
+    return failed - 1;
+}
+
+void EndRunGuard()
+{
+    wchar_t file[MAX_PATH + 64] = {};
+    if (StatePath(file, MAX_PATH)) WriteState(file, "ok");
+}
+
 void LogInit(const std::wstring& path, LogLevel minLevel)
 {
     std::lock_guard<std::mutex> lock(g_logMutex);

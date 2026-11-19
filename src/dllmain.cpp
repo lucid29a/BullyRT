@@ -200,6 +200,65 @@ static void LogGameExe()
              path, size, static_cast<unsigned long>(stamp), base, os.dwMajorVersion, os.dwMinorVersion, os.dwBuildNumber);
 }
 
+static int g_safeLevel = 0;
+
+static bool FileThere(const std::wstring& p) { return GetFileAttributesW(p.c_str()) != INVALID_FILE_ATTRIBUTES; }
+
+static void Preflight()
+{
+    OSVERSIONINFOEXW os = {sizeof(os)};
+    using RtlGetVersionFn = LONG(WINAPI*)(OSVERSIONINFOEXW*);
+    if (auto fn = reinterpret_cast<RtlGetVersionFn>(GetProcAddress(GetModuleHandleW(L"ntdll.dll"), "RtlGetVersion"))) fn(&os);
+    Config& cfg = MutableConfig();
+    std::string problems;
+
+    if (os.dwBuildNumber < 17134) {
+        problems += " Windows build " + std::to_string(os.dwBuildNumber) + " is older than 17134 (no D3D9On12);";
+        cfg.backend = Backend::Native;
+        cfg.extensionsEnabled = false;
+    }
+
+    static const wchar_t* kDlls[] = {L"d3d12.dll", L"dxgi.dll", L"d3d9.dll", L"d3dcompiler_47.dll", L"d3dx9_38.dll"};
+    for (const wchar_t* d : kDlls) {
+        HMODULE m = LoadLibraryExW(d, nullptr, LOAD_LIBRARY_SEARCH_SYSTEM32);
+        const bool inGame = !m && FileThere(GameDirectory() + d);
+        BDX_INFO("Preflight: %ls %s", d, m ? "found" : inGame ? "found in the game folder" : "MISSING");
+        if (!m && !inGame) {
+            if (!_wcsicmp(d, L"d3d12.dll") || !_wcsicmp(d, L"dxgi.dll")) {
+                problems += std::string(" ") + Narrow(d) + " is missing (no Direct3D 12);";
+                cfg.backend = Backend::Native;
+                cfg.extensionsEnabled = false;
+            } else if (!_wcsicmp(d, L"d3dcompiler_47.dll")) {
+                problems += " d3dcompiler_47.dll is missing;";
+            }
+        }
+    }
+
+    const std::wstring dir = GameDirectory() + L"BullyDX12\\bridge\\";
+    static const wchar_t* kFiles[] = {L"BullyRTBridge.exe", L"D3D12\\D3D12Core.dll", L"lamps.dat", L"materials.ini"};
+    for (const wchar_t* f : kFiles) {
+        const bool there = FileThere(dir + f);
+        BDX_INFO("Preflight: BullyDX12\\bridge\\%ls %s", f, there ? "found" : "MISSING");
+        if (!there) problems += std::string(" BullyDX12\\bridge\\") + Narrow(f) + " is missing (copy the whole archive, not only d3d9.dll);";
+    }
+    if (!FileThere(GameDirectory() + L"BullyDX12\\extensions\\RaytracingBridge.dll")) problems += " BullyDX12\\extensions\\RaytracingBridge.dll is missing;";
+
+    if (!problems.empty()) BDX_WARN("Preflight: problems found:%s", problems.c_str());
+    else BDX_INFO("Preflight: everything the ray tracing needs is here");
+
+    if (cfg.GetInt("Safety", "Guard", 1) != 0) {
+        const int failed = BeginRunGuard();
+        g_safeLevel = failed >= 3 ? 2 : failed >= 2 ? 1 : 0;
+        if (g_safeLevel >= 1) {
+            cfg.extensionsEnabled = false;
+            if (g_safeLevel >= 2) cfg.backend = Backend::Native;
+            BDX_WARN("SAFE MODE %d: the last %d starts did not finish. Running %s. Starting normally once puts everything back "
+                     "(delete %%LOCALAPPDATA%%\\BullyDX12\\state.txt to force a normal start, or set [Safety] Guard=0).",
+                     g_safeLevel, failed, g_safeLevel >= 2 ? "on the stock Direct3D 9 with no extensions" : "without the extensions (no ray tracing, no patches)");
+        }
+    }
+}
+
 static LPTOP_LEVEL_EXCEPTION_FILTER g_prevCrashFilter = nullptr;
 static LONG WINAPI CrashFilter(EXCEPTION_POINTERS* ep)
 {
@@ -230,6 +289,7 @@ BOOL APIENTRY DllMain(HMODULE module, DWORD reason, LPVOID reserved)
         LogInit(GameDirectory() + L"BullyDX12.log", GetConfig().logLevel);
         Startup("log opened");
         LogGameExe();
+        Preflight();
         g_prevCrashFilter = SetUnhandledExceptionFilter(&CrashFilter);
         if (GetConfig().GetInt("Display", "DpiAware", 1) != 0) {
             const BOOL ok = SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2) ||
@@ -239,12 +299,13 @@ BOOL APIENTRY DllMain(HMODULE module, DWORD reason, LPVOID reserved)
         Display::Get().LoadConfig();
         Display::Get().InstallModeChangeHooks();
         Startup("display hooks installed");
-        GrowGameHeap();
+        if (g_safeLevel == 0) GrowGameHeap();
         Startup("DllMain done");
         break;
     case DLL_PROCESS_DETACH:
         (void)reserved;
         BDX_INFO("BullyDX12 detached (process exit)");
+        EndRunGuard();
         LogShutdown();
         break;
     }

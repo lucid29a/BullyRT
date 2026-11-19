@@ -121,6 +121,7 @@ public:
         cl->OMSetRenderTargets(1, &rtv, FALSE, nullptr);
         cl->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
         cl->DrawInstanced(3, 1, 0, 0);
+        if (ctx.drawn) *ctx.drawn = true;
     }
 
 private:

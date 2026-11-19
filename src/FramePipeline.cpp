@@ -133,7 +133,9 @@ bool FramePipeline::RunPass(size_t passIndex, IDirect3DTexture9* in, IDirect3DTe
         b[1].Transition.StateAfter  = D3D12_RESOURCE_STATE_RENDER_TARGET;
         list->ResourceBarrier(2, b);
 
+        bool drawn            = false;
         PostProcessContext pc = {};
+        pc.drawn              = &drawn;
         pc.commandList        = list;
         pc.input              = in12.Get();
         pc.output             = out12.Get();
@@ -148,7 +150,7 @@ bool FramePipeline::RunPass(size_t passIndex, IDirect3DTexture9* in, IDirect3DTe
         std::swap(b[1].Transition.StateBefore, b[1].Transition.StateAfter);
         list->ResourceBarrier(2, b);
         ctx.Execute(list);
-        ok = true;
+        ok = drawn;
     }
 
     ctx.DeferredRelease(in12.Detach());
@@ -199,11 +201,14 @@ void FramePipeline::OnPresent(IDirect3DDevice9* device)
         }
     }
 
-    if (em.GetFrameIndex() == 0)
+    if (em.GetFrameIndex() == 0) {
         Startup("first frame presented: the game is running");
         BDX_INFO("First frame presented (%ux%u, backend %s, D3D12 post-process %s)", bbDesc.Width, bbDesc.Height,
                  em.GetBackend() == Backend::D3D9On12 ? "D3D9On12" : em.GetBackend() == Backend::Native ? "Native" : "External",
                  canPostProcess ? "active" : "inactive");
+    }
+
+    if (em.GetFrameIndex() == 300) EndRunGuard();
 
     FrameInfo fi        = {};
     fi.frameIndex       = em.GetFrameIndex();

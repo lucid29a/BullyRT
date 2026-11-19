@@ -27,6 +27,8 @@ namespace bdx12 {
 
 void        LogInit(const std::wstring& path, LogLevel minLevel);
 void        Startup(const char* step);
+int         BeginRunGuard();
+void        EndRunGuard();
 void        LogShutdown();
 void        LogV(LogLevel level, const char* fmt, va_list args);
 void        LogF(LogLevel level, const char* fmt, ...);
